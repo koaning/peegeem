@@ -14,10 +14,10 @@
 import marimo
 
 __generated_with = "0.12.10"
-app = marimo.App(width="columns")
+app = marimo.App(width="full")
 
 
-@app.cell(column=0)
+@app.cell
 def _(pd):
     df_smoking = (pd.read_csv("https://calmcode.io/static/data/smoking.csv")
                   .assign(age=lambda d: (d["age"] / 10).round() * 10))
@@ -90,8 +90,14 @@ def _(P, age, alt, outcome, pd, smoker):
 
 
 @app.cell
-def _(P, age, mo, outcome, smoker):
-    mo.md(text="$$" + P.to_latex(outcome | (smoker == "Yes") & (age > 50)) + "$$")
+def _(P, age, do, mo, outcome, smoker):
+    mo.md(text="$$" + P.to_latex(outcome | do(smoker == "Yes") & (age > 50)) + "$$")
+    return
+
+
+@app.cell
+def _(P, age, do, outcome, smoker):
+    P(outcome | do(smoker == "Yes") & (age > 50))
     return
 
 
@@ -136,25 +142,9 @@ def _(dag):
 
 
 @app.cell
-def _():
-    from dicekit import Dice
-    return (Dice,)
+def _(NotImplementedi):
+    ## Export
 
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md(r""" """)
-    return
-
-
-@app.cell(column=1)
-def _():
-    # Import necessary libraries
     import pandas as pd
     from pgmpy.models import DiscreteBayesianNetwork
     from pgmpy.estimators import MaximumLikelihoodEstimator
@@ -168,193 +158,268 @@ def _():
     # Forward declaration for type hinting
     class DAG: pass
     class Variable: pass
-    class VariableCombination: pass
+    class VariablCombination: pass
     class Condition: pass
     class QueryExpression: pass
     class TargetStateQuery: pass
     class DoCondition: pass
     class DoRangeCondition: pass
 
-
-    # --- Condition Class ---
-    # (Remains the same)
     class Condition:
         """Represents a standard evidence condition (e.g., variable == value)."""
         def __init__(self, variable_name: str, operator: str, value: Any, dag_instance: DAG):
-            self.variable_name = variable_name; self.operator = operator; self.value = value; self._dag = dag_instance
-        def __repr__(self): return f"Condition({self.variable_name} {self.operator} {repr(self.value)})"
+            self.variable_name = variable_name
+            self.operator = operator
+            self.value = value
+            self._dag = dag_instance
+        
+        def __repr__(self): 
+            return f"Condition({self.variable_name} {self.operator} {repr(self.value)})"
+        
         def __and__(self, other: Union['Condition', 'DoCondition', 'DoRangeCondition', List[Any]]) -> List[Any]:
             valid_types = (Condition, DoCondition, DoRangeCondition)
             if isinstance(other, valid_types):
-                if self._dag is not other._dag: raise ValueError("Cannot combine conditions/interventions from different DAG instances.")
+                if self._dag is not other._dag: 
+                    raise ValueError("Cannot combine conditions/interventions from different DAG instances.")
                 return [self, other]
             elif isinstance(other, list):
-                if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): raise ValueError("Invalid item or DAG mismatch in condition list.")
+                if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): 
+                    raise ValueError("Invalid item or DAG mismatch in condition list.")
                 return [self] + other
-            else: return NotImplemented
+            else: 
+                return NotImplemented
+            
         def __rand__(self, other: Union[Any]) -> List[Any]:
              valid_types = (Condition, DoCondition, DoRangeCondition)
              if isinstance(other, list):
-                 if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): raise ValueError("Invalid item or DAG mismatch in condition list.")
+                 if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): 
+                     raise ValueError("Invalid item or DAG mismatch in condition list.")
                  return other + [self]
              return NotImplemented
 
-    # --- DoCondition Class ---
-    # (Remains the same)
     class DoCondition:
         """Represents a causal intervention condition (do(variable = value))."""
         def __init__(self, variable_name: str, value: Any, dag_instance: DAG):
-            self.variable_name = variable_name; self.value = value; self._dag = dag_instance; self.operator = 'do=='
-        def __repr__(self): return f"Do({self.variable_name}={repr(self.value)})"
+            self.variable_name = variable_name
+            self.value = value
+            self._dag = dag_instance
+            self.operator = 'do=='
+        
+        def __repr__(self): 
+            return f"Do({self.variable_name}={repr(self.value)})"
+        
         def __and__(self, other: Union[Condition, 'DoCondition', 'DoRangeCondition', List[Any]]) -> List[Any]:
             valid_types = (Condition, DoCondition, DoRangeCondition)
             if isinstance(other, valid_types):
-                if self._dag is not other._dag: raise ValueError("Cannot combine conditions/interventions from different DAG instances.")
+                if self._dag is not other._dag: 
+                    raise ValueError("Cannot combine conditions/interventions from different DAG instances.")
                 return [self, other]
             elif isinstance(other, list):
-                if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): raise ValueError("Invalid item or DAG mismatch in condition list.")
+                if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): 
+                    raise ValueError("Invalid item or DAG mismatch in condition list.")
                 return [self] + other
-            else: return NotImplemented
+            else: 
+                return NotImplemented
+            
         def __rand__(self, other: Union[Any]) -> List[Any]:
              valid_types = (Condition, DoCondition, DoRangeCondition)
              if isinstance(other, list):
-                 if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): raise ValueError("Invalid item or DAG mismatch in condition list.")
+                 if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): 
+                     raise ValueError("Invalid item or DAG mismatch in condition list.")
                  return other + [self]
              return NotImplemented
 
-    # --- DoRangeCondition Class ---
-    # (Remains the same)
     class DoRangeCondition:
         """Represents a causal 'intervention' specified by a range (e.g., do(age > 40))."""
         def __init__(self, variable_name: str, operator: str, value: Any, dag_instance: DAG):
-            self.variable_name = variable_name; self.operator = operator; self.value = value; self._dag = dag_instance
-        def __repr__(self): return f"DoRange({self.variable_name} {self.operator} {repr(self.value)})"
+            self.variable_name = variable_name 
+            self.operator = operator 
+            self.value = value 
+            self._dag = dag_instance
+        
+        def __repr__(self): 
+            return f"DoRange({self.variable_name} {self.operator} {repr(self.value)})"
+        
         def __and__(self, other: Union[Condition, DoCondition, 'DoRangeCondition', List[Any]]) -> List[Any]:
             valid_types = (Condition, DoCondition, DoRangeCondition)
             if isinstance(other, valid_types):
-                if self._dag is not other._dag: raise ValueError("Cannot combine conditions/interventions from different DAG instances.")
+                if self._dag is not other._dag: 
+                    raise ValueError("Cannot combine conditions/interventions from different DAG instances.")
                 return [self, other]
             elif isinstance(other, list):
-                if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): raise ValueError("Invalid item or DAG mismatch in condition list.")
+                if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): 
+                    raise ValueError("Invalid item or DAG mismatch in condition list.")
                 return [self] + other
-            else: return NotImplemented
+            else: 
+                return NotImplemented
+            
         def __rand__(self, other: Union[Any]) -> List[Any]:
              valid_types = (Condition, DoCondition, DoRangeCondition)
              if isinstance(other, list):
-                 if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): raise ValueError("Invalid item or DAG mismatch in condition list.")
+                 if not all((isinstance(c, valid_types) and c._dag is self._dag) for c in other): 
+                     raise ValueError("Invalid item or DAG mismatch in condition list.")
                  return other + [self]
              return NotImplemented
 
-
-    # --- Updated do() function ---
-    # (Remains the same)
     def do(condition_obj: Condition) -> Union[DoCondition, DoRangeCondition]:
         """Creates a DoCondition or DoRangeCondition for causal intervention/filtering."""
-        if not isinstance(condition_obj, Condition): raise TypeError("Argument to do() must be a condition created from a Variable (e.g., variable == value, variable > 40).")
+        if not isinstance(condition_obj, Condition): 
+            raise TypeError("Argument to do() must be a condition created from a Variable (e.g., variable == value, variable > 40).")
         if condition_obj.operator == '==':
-            return DoCondition(variable_name=condition_obj.variable_name, value=condition_obj.value, dag_instance=condition_obj._dag)
+            return DoCondition(
+                variable_name=condition_obj.variable_name, 
+                value=condition_obj.value, 
+                dag_instance=condition_obj._dag
+            )
         elif condition_obj.operator in ['!=', '>', '>=', '<', '<=']:
-             # print(f"Note: Interpreting do({condition_obj.variable_name} {condition_obj.operator} {condition_obj.value}) as post-intervention filtering.") # Reduce noise
-             return DoRangeCondition(variable_name=condition_obj.variable_name, operator=condition_obj.operator, value=condition_obj.value, dag_instance=condition_obj._dag)
+             return DoRangeCondition(
+                 variable_name=condition_obj.variable_name, 
+                 operator=condition_obj.operator, 
+                 value=condition_obj.value, 
+                 dag_instance=condition_obj._dag
+             )
         else: raise ValueError(f"Unsupported operator '{condition_obj.operator}' passed to do().")
 
 
-    # --- Variable Combination Class ---
-    # (Remains the same)
     class VariableCombination:
         """Represents a combination of multiple variables for joint probability queries."""
         def __init__(self, variables: List[Variable]):
-            if not variables: raise ValueError("VariableCombination cannot be empty.")
+            if not variables: 
+                raise ValueError("VariableCombination cannot be empty.")
             first_dag = variables[0]._dag
-            if not all(isinstance(v, Variable) and v._dag is first_dag for v in variables): raise ValueError("All items must be Variables from the same DAG.")
-            self.variables = list(dict.fromkeys(variables)); self._dag = first_dag
-        def __repr__(self): return f"VariableCombination([{', '.join(v.name for v in self.variables)}])"
+            if not all(isinstance(v, Variable) and v._dag is first_dag for v in variables): 
+                raise ValueError("All items must be Variables from the same DAG.")
+            self.variables = list(dict.fromkeys(variables))
+            self._dag = first_dag
+        
+        def __repr__(self): 
+            return f"VariableCombination([{', '.join(v.name for v in self.variables)}])"
+        
         def __and__(self, other: Union[Variable, 'VariableCombination']) -> 'VariableCombination':
             if isinstance(other, Variable):
-                if other._dag is not self._dag: raise ValueError("Cannot combine variables from different DAGs.")
+                if other._dag is not self._dag: 
+                    raise ValueError("Cannot combine variables from different DAGs.")
                 return VariableCombination(self.variables + [other])
             elif isinstance(other, VariableCombination):
-                if other._dag is not self._dag: raise ValueError("Cannot combine variables from different DAGs.")
+                if other._dag is not self._dag: 
+                    raise ValueError("Cannot combine variables from different DAGs.")
                 return VariableCombination(self.variables + other.variables)
-            return NotImplemented
+            return NotImplementedi
+        
         def __rand__(self, other: Variable) -> 'VariableCombination':
              if isinstance(other, Variable):
-                 if other._dag is not self._dag: raise ValueError("Cannot combine variables from different DAGs.")
+                 if other._dag is not self._dag: 
+                     raise ValueError("Cannot combine variables from different DAGs.")
                  return VariableCombination([other] + self.variables)
              return NotImplemented
+        
         def __or__(self, conditions: Union[Condition, DoCondition, DoRangeCondition, List[Any]]) -> 'QueryExpression':
             return QueryExpression(target=self, conditions=conditions)
 
 
-    # --- Target State Query Class ---
-    # (Remains the same)
     class TargetStateQuery:
         """Represents a query for the probability of a specific state of a variable."""
         def __init__(self, variable: Variable, state: Any):
             self.variable = variable
             processed_state, _ = variable._process_value_for_state_check(state)
-            self.state = processed_state; self._dag = variable._dag
-        def __repr__(self): return f"TargetStateQuery({self.variable.name} == {repr(self.state)})"
+            self.state = processed_state 
+            self._dag = variable._dag
+        
+        def __repr__(self): 
+            return f"TargetStateQuery({self.variable.name} == {repr(self.state)})"
+        
         def __or__(self, conditions: Union[Condition, DoCondition, DoRangeCondition, List[Any]]) -> 'QueryExpression':
             """Creates query P(var == state | conditions/interventions)."""
             return QueryExpression(target=self, conditions=conditions)
 
 
-    # --- Updated Variable Class ---
-    # (Remains the same)
     class Variable:
         """Represents a variable (node) in the DAG with overloaded operators. Made hashable."""
-        def __init__(self, name: str, dag_instance: DAG): self.name = name; self._dag = dag_instance
-        def __repr__(self): return f"Variable({self.name})"
-        def __str__(self): return self.name
-        def is_(self, value: Any) -> TargetStateQuery: return TargetStateQuery(self, value)
+        def __init__(self, name: str, dag_instance: DAG): 
+            self.name = name; self._dag = dag_instance
+        
+        def __repr__(self): 
+            return f"Variable({self.name})"
+        
+        def __str__(self): 
+            return self.name
+        
+        def is_(self, value: Any) -> TargetStateQuery: 
+            return TargetStateQuery(self, value)
+        
         def __eq__(self, other: object) -> Union[bool, Condition]:
-            if isinstance(other, Variable): return self.name == other.name and self._dag is other._dag
-            else: processed_value, _ = self._process_value_for_state_check(other); return Condition(self.name, '==', processed_value, self._dag)
+            if isinstance(other, Variable): 
+                return self.name == other.name and self._dag is other._dag
+            else: 
+                processed_value, _ = self._process_value_for_state_check(other)
+                return Condition(self.name, '==', processed_value, self._dag)
+            
         def __ne__(self, other: object) -> Condition:
-            if isinstance(other, Variable): raise TypeError("'!=' between Variable objects not supported.")
-            processed_value, _ = self._process_value_for_state_check(other); return Condition(self.name, '!=', processed_value, self._dag)
+            if isinstance(other, Variable): 
+                raise TypeError("'!=' between Variable objects not supported.")
+            processed_value, _ = self._process_value_for_state_check(other)
+            return Condition(self.name, '!=', processed_value, self._dag)
+        
         def __gt__(self, other: object) -> Condition:
-            if isinstance(other, Variable): raise TypeError("'>' between Variable objects not supported.")
+            if isinstance(other, Variable): 
+                raise TypeError("'>' between Variable objects not supported.")
             processed_value, is_numeric = self._process_value_for_state_check(other)
-            if not is_numeric: print(f"Warning: Applying '>' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
+        
+            if not is_numeric: 
+                print(f"Warning: Applying '>' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
             return Condition(self.name, '>', processed_value, self._dag)
+        
         def __ge__(self, other: object) -> Condition:
-            if isinstance(other, Variable): raise TypeError("'>=' between Variable objects not supported.")
+            if isinstance(other, Variable): 
+                raise TypeError("'>=' between Variable objects not supported.")
             processed_value, is_numeric = self._process_value_for_state_check(other)
-            if not is_numeric: print(f"Warning: Applying '>=' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
+            if not is_numeric: 
+                print(f"Warning: Applying '>=' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
             return Condition(self.name, '>=', processed_value, self._dag)
+        
         def __lt__(self, other: object) -> Condition:
-            if isinstance(other, Variable): raise TypeError("'<' between Variable objects not supported.")
+            if isinstance(other, Variable): 
+                raise TypeError("'<' between Variable objects not supported.")
             processed_value, is_numeric = self._process_value_for_state_check(other)
-            if not is_numeric: print(f"Warning: Applying '<' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
+            if not is_numeric: 
+                print(f"Warning: Applying '<' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
             return Condition(self.name, '<', processed_value, self._dag)
+        
         def __le__(self, other: object) -> Condition:
-            if isinstance(other, Variable): raise TypeError("'<=' between Variable objects not supported.")
+            if isinstance(other, Variable): 
+                raise TypeError("'<=' between Variable objects not supported.")
             processed_value, is_numeric = self._process_value_for_state_check(other)
-            if not is_numeric: print(f"Warning: Applying '<=' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
+            if not is_numeric: 
+                print(f"Warning: Applying '<=' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
             return Condition(self.name, '<=', processed_value, self._dag)
+        
         def _process_value_for_state_check(self, value: Any) -> Tuple[Any, bool]:
             is_numeric = isinstance(value, (int, float))
             try:
                 if not hasattr(self._dag, 'model') or not hasattr(self._dag, '_bool_cols'): raise AttributeError("DAG model not fully initialized.")
                 processed_value = str(value) if self.name in self._dag._bool_cols else value
                 return processed_value, is_numeric
-            except Exception as e: print(f"Warning: Could not fully process/verify value '{repr(value)}' for var '{self.name}': {e}"); return value, is_numeric
+            except Exception as e: 
+                print(f"Warning: Could not fully process/verify value '{repr(value)}' for var '{self.name}': {e}")
+                return value, is_numeric
+            
         def __or__(self, conditions: Union[Condition, DoCondition, DoRangeCondition, List[Any]]) -> 'QueryExpression':
             """Creates a query expression using '|' for 'given': target | conditions/interventions."""
             return QueryExpression(target=self, conditions=conditions)
+        
         def __and__(self, other: Union[Variable, VariableCombination]) -> VariableCombination:
             if isinstance(other, Variable):
-                if other._dag is not self._dag: raise ValueError("Cannot combine variables from different DAGs.")
+                if other._dag is not self._dag: 
+                    raise ValueError("Cannot combine variables from different DAGs.")
                 return VariableCombination([self, other])
-            elif isinstance(other, VariableCombination): return other.__rand__(self)
+            elif isinstance(other, VariableCombination): 
+                return other.__rand__(self)
             return NotImplemented
-        def __hash__(self) -> int: return hash(self.name)
+        
+        def __hash__(self) -> int: 
+            return hash(self.name)
 
 
-    # --- Updated Query Expression Class ---
-    # (Remains the same)
     class QueryExpression:
         """Represents a probability query expression with potential interventions."""
         def __init__(self, target: Union[Variable, VariableCombination, TargetStateQuery],
@@ -376,22 +441,31 @@ def _():
         def __repr__(self): return f"QueryExpression(Target: {repr(self.target)}, Conditions: {self.conditions})"
 
 
-    # --- Helper Function for Range Queries ---
-    # (Remains the same)
     def _get_matching_states(variable_name: str, operator: str, value: Any, dag_instance: DAG) -> List[Any]:
         """Identifies discrete states of a variable that satisfy a given condition."""
-        try: cpd = dag_instance.model.get_cpds(variable_name); all_states = cpd.state_names[variable_name] if cpd else []
-        except Exception as e: print(f"Warning: Could not retrieve states for variable '{variable_name}': {e}"); return []
-        matching_states = []; value_is_numeric = isinstance(value, (int, float))
+        try: 
+            cpd = dag_instance.model.get_cpds(variable_name)
+            all_states = cpd.state_names[variable_name] if cpd else []
+        except Exception as e: 
+            print(f"Warning: Could not retrieve states for variable '{variable_name}': {e}") 
+            return []
+        matching_states = []
+        value_is_numeric = isinstance(value, (int, float))
+    
         for state in all_states:
             state_matches = False
             try:
-                state_numeric = None; range_match = re.match(r"([-+]?\d*\.?\d+)\s*-\s*([-+]?\d*\.?\d+)", str(state))
-                try: state_numeric = float(state); is_single_number_state = True
-                except ValueError: is_single_number_state = False
+                state_numeric = None
+                range_match = re.match(r"([-+]?\d*\.?\d+)\s*-\s*([-+]?\d*\.?\d+)", str(state))
+                try: 
+                    state_numeric = float(state)
+                    is_single_number_state = True
+                except ValueError: 
+                    is_single_number_state = False
                 if value_is_numeric:
                     if range_match:
-                        parsed_lower = float(range_match.group(1)); is_plus_range = range_match.group(2) == '+'
+                        parsed_lower = float(range_match.group(1))
+                        is_plus_range = range_match.group(2) == '+'
                         parsed_upper = float('inf') if is_plus_range else float(range_match.group(2))
                         if operator == '>': state_matches = parsed_lower > value
                         elif operator == '>=': state_matches = parsed_lower >= value
@@ -415,7 +489,8 @@ def _():
                      elif operator == '!=': state_matches = (str(state) != str(value))
             except Exception as parse_error: print(f"Warning: Could not parse state '{state}': {parse_error}"); state_matches = False
             if state_matches: matching_states.append(state)
-        # if not matching_states: print(f"Warning: Condition '{variable_name} {operator} {repr(value)}' did not match any discrete states.")
+        if not matching_states: 
+            print(f"Warning: Condition '{variable_name} {operator} {repr(value)}' did not match any discrete states.")
         return matching_states
 
     # --- Updated P_Calculator Class (Standalone) ---
@@ -478,16 +553,20 @@ def _():
             target_obj: Optional[Union[Variable, VariableCombination, TargetStateQuery]] = None
             all_conditions: List[Union[Condition, DoCondition, DoRangeCondition]] = []
 
-            # 1. Parse input to find target and conditions
-            if isinstance(query_input, (Variable, VariableCombination)): target_obj = query_input
-            elif isinstance(query_input, TargetStateQuery): target_obj = query_input
+            # Parse input to find target and conditions
+            if isinstance(query_input, (Variable, VariableCombination)): 
+                target_obj = query_input
+            elif isinstance(query_input, TargetStateQuery): 
+                target_obj = query_input
             elif isinstance(query_input, QueryExpression):
                 target_obj = query_input.target; all_conditions = query_input.conditions
-            else: raise TypeError("Input must be a Variable, VariableCombination, TargetStateQuery, or QueryExpression.")
+            else: 
+                raise TypeError("Input must be a Variable, VariableCombination, TargetStateQuery, or QueryExpression.")
 
-            if target_obj is None: raise ValueError("Query target is missing.")
+            if target_obj is None: 
+                raise ValueError("Query target is missing.")
 
-            # 2. Format target part
+            # Format target part
             target_str = ""
             if isinstance(target_obj, Variable):
                 # Wrap variable name in \text
@@ -507,13 +586,13 @@ def _():
                      state_repr = str(state_val)
                 target_str = f"{var_name}={state_repr}"
 
-            # 3. Format condition part
+            # Format condition part
             condition_str = ""
             if all_conditions:
                 formatted_conditions = [self._format_latex_condition(cond) for cond in all_conditions]
                 condition_str = " \\mid " + ", ".join(formatted_conditions)
 
-            # 4. Combine and return
+            # Combine and return
             return f"P({target_str}{condition_str})"
 
 
@@ -527,7 +606,6 @@ def _():
             # ... Separates evidence, do_equality_dict, do_range_conditions, range_conditions ...
             # ... Determines query_vars ...
             # ... Handles deterministic case ...
-            # ... Prints status using self.to_latex(query_input) ...
             # ... Performs CausalInference or VariableElimination query ...
             # ... Applies range condition filtering ...
             # ... Marginalizes ...
@@ -546,7 +624,8 @@ def _():
             elif isinstance(query_input, QueryExpression):
                 target_obj = query_input.target; dag_instance = query_input._dag; all_conditions = query_input.conditions
                 if isinstance(target_obj, TargetStateQuery): is_specific_state_query = True
-            else: raise TypeError("Input to P() must be a Variable, VariableCombination, TargetStateQuery, or QueryExpression.")
+            else: 
+                raise TypeError("Input to P() must be a Variable, VariableCombination, TargetStateQuery, or QueryExpression.")
 
             # Separate conditions
             equality_evidence = {}; do_equality_dict = {}; do_range_conditions = []; range_conditions = []
@@ -586,11 +665,6 @@ def _():
                      target_var, target_state = target_obj.variable.name, target_obj.state
                      return 1.0 if target_var in do_equality_dict and do_equality_dict[target_var] == target_state else 0.0
                  return [] if not is_specific_state_query else 0.0
-
-            # Print status using LaTeX
-            query_repr = self.to_latex(query_input)
-            print(f"Calculating ${query_repr}$ using {'CausalInference' if has_intervention else 'VariableElimination'}")
-            # (Removed other print statements for brevity, can be added back if needed)
 
             # 3. Perform main query
             try:
@@ -667,7 +741,6 @@ def _():
                                if isinstance(desired_state, bool): current_state_for_target = (current_state_for_target.lower() == 'true')
                           if current_state_for_target == actual_desired_state: probability += final_probabilities[prob_idx]
                           prob_idx += 1
-                     # print(f"  Extracted probability: {probability:.4f}") # Reduce noise
                      return float(probability)
                 else: # Format full distribution
                     output_list = []; final_factor_vars = final_factor.variables
@@ -690,11 +763,9 @@ def _():
                 import traceback; traceback.print_exc(); raise
 
 
-    # --- Instantiate P globally ---
     P = P_Calculator()
 
-    # --- Updated DAG Class ---
-    # (Remains the same)
+
     class DAG:
         """Represents a Directed Acyclic Graph (DAG) learned from data."""
         def __init__(self, nodes, edges, dataframe):
@@ -703,37 +774,54 @@ def _():
             if not all(node in dataframe.columns for node in self.nodes):
                 missing_nodes = [node for node in self.nodes if node not in dataframe.columns]
                 raise ValueError(f"Nodes {missing_nodes} not found in DataFrame columns.")
-            self.edges = edges; self.dataframe = dataframe; self._variables = {}
-            print("Initializing Discrete Bayesian Network model...")
-            self.model = DiscreteBayesianNetwork(ebunch=edges); self.model.add_nodes_from(self.nodes)
-            print(f"Fitting model to data using {len(dataframe)} samples...")
-            df_copy = dataframe.copy(); self._bool_cols = df_copy.select_dtypes(include=['bool']).columns.tolist()
-            for col in self._bool_cols: df_copy[col] = df_copy[col].astype(str)
+            self.edges = edges
+            self.dataframe = dataframe
+            self._variables = {}
+        
+            self.model = DiscreteBayesianNetwork(ebunch=edges)
+            self.model.add_nodes_from(self.nodes)
+        
+            df_copy = dataframe.copy()
+            self._bool_cols = df_copy.select_dtypes(include=['bool']).columns.tolist()
+            for col in self._bool_cols: 
+                df_copy[col] = df_copy[col].astype(str)
             self._state_metadata = {}
-            if 'age' in nodes: self._state_metadata['age'] = {'type': 'numerical_bin'}
+            if 'age' in nodes: 
+                self._state_metadata['age'] = {'type': 'numerical_bin'}
             self.model.fit(df_copy, estimator=MaximumLikelihoodEstimator)
-            print("Checking model validity...");
+        
             try:
-                if not self.model.check_model(): print("Warning: Model check reported issues.")
-                else: print("Model check passed.")
-            except Exception as e: print(f"Warning: Model check failed with an error: {e}.")
-            print("Initializing inference engine..."); self.inference = VariableElimination(self.model); print("DAG initialization complete.")
+                if not self.model.check_model(): 
+                    print("Warning: Model check reported issues.")
+            except Exception as e: 
+                print(f"Warning: Model check failed with an error: {e}.")
+        
+            self.inference = VariableElimination(self.model)
 
         def get_variables(self) -> List[Variable]:
             if len(self._variables) != len(self.nodes):
-                 temp_vars = {}; [temp_vars.update({name: self._variables.get(name, Variable(name, self))}) for name in self.nodes]; self._variables = temp_vars
+                temp_vars = {}
+                for name in self.nodes:
+                    temp_vars.update({name: self._variables.get(name, Variable(name, self))})
+                self._variables = temp_vars
             return [self._variables[name] for name in self.nodes]
+        
         def _prepare_evidence(self, evidence_dict):
             prepared_evidence = {}
-            for var, value in evidence_dict.items(): prepared_evidence[var] = str(value) if var in self._bool_cols else value
+            for var, value in evidence_dict.items(): 
+                prepared_evidence[var] = str(value) if var in self._bool_cols else value
             return prepared_evidence
-        def P(self, target_variable, evidence=None) -> DiscreteFactor: # Original method
+        
+        def P(self, target_variable, evidence=None) -> DiscreteFactor:
             target_name = target_variable.name if isinstance(target_variable, Variable) else target_variable
-            if target_name not in self.nodes: raise ValueError(f"Unknown target variable: {target_name}")
+            if target_name not in self.nodes: 
+                raise ValueError(f"Unknown target variable: {target_name}")
             prepared_evidence = self._prepare_evidence(evidence) if evidence else None
-            # print(f"Calculating P({target_name} | {prepared_evidence}) using DAG.P method")
-            try: return self.inference.query(variables=[target_name], evidence=prepared_evidence, show_progress=False)
-            except Exception as e: print(f"Error during inference via DAG.P for P({target_name} | {prepared_evidence}): {e}"); raise
+            try: 
+                return self.inference.query(variables=[target_name], evidence=prepared_evidence, show_progress=False)
+            except Exception as e: 
+                print(f"Error during inference via DAG.P for P({target_name} | {prepared_evidence}): {e}")
+                raise
 
     return (
         Any,
@@ -754,6 +842,7 @@ def _():
         TargetStateQuery,
         Tuple,
         Union,
+        VariablCombination,
         Variable,
         VariableCombination,
         VariableElimination,
@@ -775,7 +864,7 @@ def _():
     return
 
 
-@app.cell(column=2)
+@app.cell
 def test_true():
     def test_true():
         assert True
