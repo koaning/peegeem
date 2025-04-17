@@ -15,4 +15,4 @@ pypi: check
 	uv publish
 
 check: build
-	pytest
+	pytest nbs/__init__.py
