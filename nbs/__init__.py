@@ -7,6 +7,7 @@
 #     "numpy==2.2.4",
 #     "pandas==2.2.3",
 #     "pgmpy==1.0.0",
+#     "polars==1.27.1",
 #     "wigglystuff==0.1.13",
 # ]
 # ///
@@ -17,20 +18,19 @@ __generated_with = "0.12.10"
 app = marimo.App(width="full")
 
 
-@app.cell
-def _(pd):
-    df_smoking = (pd.read_csv("https://calmcode.io/static/data/smoking.csv")
-                  .assign(age=lambda d: (d["age"] / 10).round() * 10))
-    return (df_smoking,)
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
         """
-        This is what a domain specific language might look like. 
+        # Welcome to `peegeem` 
+
+        > The name should remind you of "pgm".
+
+        The whole point of the library is that you have an API to do stuff like this: 
 
         ```python
+        from peegeem import DAG
+
         # Define the DAG for the PGM
         dag = DAG(nodes, edges, dataframe)
 
@@ -39,35 +39,40 @@ def _(mo):
 
         # Use variables to construct a probablistic query
         P(outcome | (smoker == "Yes") & (age > 40))
+
+        # Latex utility, why not?
+        P.to_latex(outcome | (smoker == "Yes") & (age > 40))
         ```
 
-        But why stop there?
+        The goal is to have an API that really closely mimics the math notation, so stuff like this:
+
+        $$ P(\\text{outcome} \\mid do(\\text{smoker}=\\texttt{Yes}), \\text{age}>40) $$
+
+        That means that we indeed also have a `do` function!
+
+        ```python 
+        # You can also get crazy fancy 
+        P(A & B | C & do(D))
+        ```
+
+        But why stop there? Having a domain specific language is cool, but what if we'd be able to combine this with a domian specific interface as well?
+
+        ## Demotime
+
+        We use the `smoking` dataset here as a demonstration ([link](https://calmcode.io/datasets/smoking)). The dataset has three values: 
+
+        - **smoker** indicates if the person was a smoker
+        - **age** is the age of a person
+        - **outcome** represents if the person was still alive 10 years later
+
+        These variables are all made discrete and you could draw a causal diagram if you wanted to. You can do that below. Draw edges in the graph view and see how the table and chart updates.
         """
     )
     return
 
 
-@app.cell(hide_code=True)
-def _(df_smoking, mo):
-    from wigglystuff import EdgeDraw
-
-    edge_draw = mo.ui.anywidget(EdgeDraw(list(df_smoking.columns)))
-    edge_draw
-    return EdgeDraw, edge_draw
-
-
-@app.cell(hide_code=True)
-def _(age_range, alive_no_smoke, alive_smoke, pd):
-    pd.DataFrame({
-        "age": age_range, 
-        "smoke": alive_smoke, 
-        "no-smoke": alive_no_smoke
-    })
-    return
-
-
 @app.cell
-def _(P, age, alt, outcome, pd, smoker):
+def _(P, age, alt, edge_draw, mo, outcome, pd, smoker):
     age_range = range(10, 70, 10)
 
     alive_smoke = [
@@ -79,14 +84,37 @@ def _(P, age, alt, outcome, pd, smoker):
         for a in age_range
     ]
 
-    pltr = pd.DataFrame({
+    df_out = pd.DataFrame({
         "age": age_range, 
         "smoke": alive_smoke, 
         "no-smoke": alive_no_smoke
-    }).melt("age")
+    })
 
-    alt.Chart(pltr).mark_line().encode(x="age", y="value", color="variable").properties(title="Probability of being alive after 10 years")
-    return age_range, alive_no_smoke, alive_smoke, pltr
+    pltr = df_out.melt("age")
+
+    chart_out = (
+        alt.Chart(pltr)
+        .mark_line()
+        .encode(x="age", y="value", color="variable")
+        .properties(
+            title="Probability of being alive after 10 years", 
+            width=200, 
+            height=200
+        )
+    )
+
+    mo.hstack([
+        edge_draw, df_out, chart_out
+    ], align="stretch")
+    return age_range, alive_no_smoke, alive_smoke, chart_out, df_out, pltr
+
+
+@app.cell(hide_code=True)
+def _(df_smoking, mo):
+    from wigglystuff import EdgeDraw
+
+    edge_draw = mo.ui.anywidget(EdgeDraw(list(df_smoking.columns)))
+    return EdgeDraw, edge_draw
 
 
 @app.cell
@@ -96,9 +124,15 @@ def _(P, age, do, mo, outcome, smoker):
 
 
 @app.cell
-def _(P, age, do, outcome, smoker):
-    P(outcome | do(smoker == "Yes") & (age > 50))
-    return
+def _(P, mo):
+    import polars as pl 
+
+    def p(expr): 
+        return mo.vstack([
+            mo.md(f"$$ {P.to_latex(expr)} $=$"),
+            pl.DataFrame(P(expr))
+        ])
+    return p, pl
 
 
 @app.cell
@@ -114,12 +148,6 @@ def _():
 
 
 @app.cell
-def _(edge_draw):
-    [(_['source'], _['target']) for _ in edge_draw.value["links"]]
-    return
-
-
-@app.cell
 def _(DAG, df_smoking, edge_draw):
     dag = DAG(
         nodes=edge_draw.value["names"], 
@@ -131,17 +159,11 @@ def _(DAG, df_smoking, edge_draw):
 
 @app.cell
 def _(dag):
-    dag.get_variables()
-    return
-
-
-@app.cell
-def _(dag):
     outcome, smoker, age = dag.get_variables()
     return age, outcome, smoker
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(NotImplementedi):
     ## Export
 
@@ -172,10 +194,10 @@ def _(NotImplementedi):
             self.operator = operator
             self.value = value
             self._dag = dag_instance
-        
+
         def __repr__(self): 
             return f"Condition({self.variable_name} {self.operator} {repr(self.value)})"
-        
+
         def __and__(self, other: Union['Condition', 'DoCondition', 'DoRangeCondition', List[Any]]) -> List[Any]:
             valid_types = (Condition, DoCondition, DoRangeCondition)
             if isinstance(other, valid_types):
@@ -188,7 +210,7 @@ def _(NotImplementedi):
                 return [self] + other
             else: 
                 return NotImplemented
-            
+
         def __rand__(self, other: Union[Any]) -> List[Any]:
              valid_types = (Condition, DoCondition, DoRangeCondition)
              if isinstance(other, list):
@@ -204,10 +226,10 @@ def _(NotImplementedi):
             self.value = value
             self._dag = dag_instance
             self.operator = 'do=='
-        
+
         def __repr__(self): 
             return f"Do({self.variable_name}={repr(self.value)})"
-        
+
         def __and__(self, other: Union[Condition, 'DoCondition', 'DoRangeCondition', List[Any]]) -> List[Any]:
             valid_types = (Condition, DoCondition, DoRangeCondition)
             if isinstance(other, valid_types):
@@ -220,7 +242,7 @@ def _(NotImplementedi):
                 return [self] + other
             else: 
                 return NotImplemented
-            
+
         def __rand__(self, other: Union[Any]) -> List[Any]:
              valid_types = (Condition, DoCondition, DoRangeCondition)
              if isinstance(other, list):
@@ -236,10 +258,10 @@ def _(NotImplementedi):
             self.operator = operator 
             self.value = value 
             self._dag = dag_instance
-        
+
         def __repr__(self): 
             return f"DoRange({self.variable_name} {self.operator} {repr(self.value)})"
-        
+
         def __and__(self, other: Union[Condition, DoCondition, 'DoRangeCondition', List[Any]]) -> List[Any]:
             valid_types = (Condition, DoCondition, DoRangeCondition)
             if isinstance(other, valid_types):
@@ -252,7 +274,7 @@ def _(NotImplementedi):
                 return [self] + other
             else: 
                 return NotImplemented
-            
+
         def __rand__(self, other: Union[Any]) -> List[Any]:
              valid_types = (Condition, DoCondition, DoRangeCondition)
              if isinstance(other, list):
@@ -291,10 +313,10 @@ def _(NotImplementedi):
                 raise ValueError("All items must be Variables from the same DAG.")
             self.variables = list(dict.fromkeys(variables))
             self._dag = first_dag
-        
+
         def __repr__(self): 
             return f"VariableCombination([{', '.join(v.name for v in self.variables)}])"
-        
+
         def __and__(self, other: Union[Variable, 'VariableCombination']) -> 'VariableCombination':
             if isinstance(other, Variable):
                 if other._dag is not self._dag: 
@@ -305,14 +327,14 @@ def _(NotImplementedi):
                     raise ValueError("Cannot combine variables from different DAGs.")
                 return VariableCombination(self.variables + other.variables)
             return NotImplementedi
-        
+
         def __rand__(self, other: Variable) -> 'VariableCombination':
              if isinstance(other, Variable):
                  if other._dag is not self._dag: 
                      raise ValueError("Cannot combine variables from different DAGs.")
                  return VariableCombination([other] + self.variables)
              return NotImplemented
-        
+
         def __or__(self, conditions: Union[Condition, DoCondition, DoRangeCondition, List[Any]]) -> 'QueryExpression':
             return QueryExpression(target=self, conditions=conditions)
 
@@ -324,10 +346,10 @@ def _(NotImplementedi):
             processed_state, _ = variable._process_value_for_state_check(state)
             self.state = processed_state 
             self._dag = variable._dag
-        
+
         def __repr__(self): 
             return f"TargetStateQuery({self.variable.name} == {repr(self.state)})"
-        
+
         def __or__(self, conditions: Union[Condition, DoCondition, DoRangeCondition, List[Any]]) -> 'QueryExpression':
             """Creates query P(var == state | conditions/interventions)."""
             return QueryExpression(target=self, conditions=conditions)
@@ -337,38 +359,38 @@ def _(NotImplementedi):
         """Represents a variable (node) in the DAG with overloaded operators. Made hashable."""
         def __init__(self, name: str, dag_instance: DAG): 
             self.name = name; self._dag = dag_instance
-        
+
         def __repr__(self): 
             return f"Variable({self.name})"
-        
+
         def __str__(self): 
             return self.name
-        
+
         def is_(self, value: Any) -> TargetStateQuery: 
             return TargetStateQuery(self, value)
-        
+
         def __eq__(self, other: object) -> Union[bool, Condition]:
             if isinstance(other, Variable): 
                 return self.name == other.name and self._dag is other._dag
             else: 
                 processed_value, _ = self._process_value_for_state_check(other)
                 return Condition(self.name, '==', processed_value, self._dag)
-            
+
         def __ne__(self, other: object) -> Condition:
             if isinstance(other, Variable): 
                 raise TypeError("'!=' between Variable objects not supported.")
             processed_value, _ = self._process_value_for_state_check(other)
             return Condition(self.name, '!=', processed_value, self._dag)
-        
+
         def __gt__(self, other: object) -> Condition:
             if isinstance(other, Variable): 
                 raise TypeError("'>' between Variable objects not supported.")
             processed_value, is_numeric = self._process_value_for_state_check(other)
-        
+
             if not is_numeric: 
                 print(f"Warning: Applying '>' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
             return Condition(self.name, '>', processed_value, self._dag)
-        
+
         def __ge__(self, other: object) -> Condition:
             if isinstance(other, Variable): 
                 raise TypeError("'>=' between Variable objects not supported.")
@@ -376,7 +398,7 @@ def _(NotImplementedi):
             if not is_numeric: 
                 print(f"Warning: Applying '>=' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
             return Condition(self.name, '>=', processed_value, self._dag)
-        
+
         def __lt__(self, other: object) -> Condition:
             if isinstance(other, Variable): 
                 raise TypeError("'<' between Variable objects not supported.")
@@ -384,7 +406,7 @@ def _(NotImplementedi):
             if not is_numeric: 
                 print(f"Warning: Applying '<' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
             return Condition(self.name, '<', processed_value, self._dag)
-        
+
         def __le__(self, other: object) -> Condition:
             if isinstance(other, Variable): 
                 raise TypeError("'<=' between Variable objects not supported.")
@@ -392,7 +414,7 @@ def _(NotImplementedi):
             if not is_numeric: 
                 print(f"Warning: Applying '<=' to non-numeric value '{repr(other)}' for variable '{self.name}'.")
             return Condition(self.name, '<=', processed_value, self._dag)
-        
+
         def _process_value_for_state_check(self, value: Any) -> Tuple[Any, bool]:
             is_numeric = isinstance(value, (int, float))
             try:
@@ -402,11 +424,11 @@ def _(NotImplementedi):
             except Exception as e: 
                 print(f"Warning: Could not fully process/verify value '{repr(value)}' for var '{self.name}': {e}")
                 return value, is_numeric
-            
+
         def __or__(self, conditions: Union[Condition, DoCondition, DoRangeCondition, List[Any]]) -> 'QueryExpression':
             """Creates a query expression using '|' for 'given': target | conditions/interventions."""
             return QueryExpression(target=self, conditions=conditions)
-        
+
         def __and__(self, other: Union[Variable, VariableCombination]) -> VariableCombination:
             if isinstance(other, Variable):
                 if other._dag is not self._dag: 
@@ -415,7 +437,7 @@ def _(NotImplementedi):
             elif isinstance(other, VariableCombination): 
                 return other.__rand__(self)
             return NotImplemented
-        
+
         def __hash__(self) -> int: 
             return hash(self.name)
 
@@ -451,7 +473,7 @@ def _(NotImplementedi):
             return []
         matching_states = []
         value_is_numeric = isinstance(value, (int, float))
-    
+
         for state in all_states:
             state_matches = False
             try:
@@ -777,10 +799,10 @@ def _(NotImplementedi):
             self.edges = edges
             self.dataframe = dataframe
             self._variables = {}
-        
+
             self.model = DiscreteBayesianNetwork(ebunch=edges)
             self.model.add_nodes_from(self.nodes)
-        
+
             df_copy = dataframe.copy()
             self._bool_cols = df_copy.select_dtypes(include=['bool']).columns.tolist()
             for col in self._bool_cols: 
@@ -789,13 +811,13 @@ def _(NotImplementedi):
             if 'age' in nodes: 
                 self._state_metadata['age'] = {'type': 'numerical_bin'}
             self.model.fit(df_copy, estimator=MaximumLikelihoodEstimator)
-        
+
             try:
                 if not self.model.check_model(): 
                     print("Warning: Model check reported issues.")
             except Exception as e: 
                 print(f"Warning: Model check failed with an error: {e}.")
-        
+
             self.inference = VariableElimination(self.model)
 
         def get_variables(self) -> List[Variable]:
@@ -805,13 +827,13 @@ def _(NotImplementedi):
                     temp_vars.update({name: self._variables.get(name, Variable(name, self))})
                 self._variables = temp_vars
             return [self._variables[name] for name in self.nodes]
-        
+
         def _prepare_evidence(self, evidence_dict):
             prepared_evidence = {}
             for var, value in evidence_dict.items(): 
                 prepared_evidence[var] = str(value) if var in self._bool_cols else value
             return prepared_evidence
-        
+
         def P(self, target_variable, evidence=None) -> DiscreteFactor:
             target_name = target_variable.name if isinstance(target_variable, Variable) else target_variable
             if target_name not in self.nodes: 
@@ -855,20 +877,17 @@ def _(NotImplementedi):
 
 
 @app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
 def test_true():
     def test_true():
         assert True
     return (test_true,)
+
+
+@app.cell
+def _(pd):
+    df_smoking = (pd.read_csv("https://calmcode.io/static/data/smoking.csv")
+                  .assign(age=lambda d: (d["age"] / 10).round() * 10))
+    return (df_smoking,)
 
 
 if __name__ == "__main__":
