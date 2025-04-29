@@ -8,6 +8,7 @@
 #     "pandas==2.2.3",
 #     "pgmpy==1.0.0",
 #     "polars==1.27.1",
+#     "pyarrow==20.0.0",
 #     "wigglystuff==0.1.13",
 # ]
 # ///
@@ -109,12 +110,33 @@ def _(P, age, alt, edge_draw, mo, outcome, pd, smoker):
     return age_range, alive_no_smoke, alive_smoke, chart_out, df_out, pltr
 
 
+@app.cell
+def _(
+    P,
+    edge_draw_sleep,
+    high_gpa,
+    many_asserts,
+    many_stories,
+    many_tests,
+    mo,
+    pl,
+    sleep,
+):
+    mo.hstack([
+        edge_draw_sleep, 
+        pl.DataFrame(P(many_tests & many_stories & many_asserts | (sleep == "deprived") & (high_gpa == True))), 
+        pl.DataFrame(P(many_tests & many_stories & many_asserts | (sleep == "normal") & (high_gpa == False)))
+    ])
+    return
+
+
 @app.cell(hide_code=True)
-def _(df_smoking, mo):
+def _(df_sleep, df_smoking, mo):
     from wigglystuff import EdgeDraw
 
     edge_draw = mo.ui.anywidget(EdgeDraw(list(df_smoking.columns)))
-    return EdgeDraw, edge_draw
+    edge_draw_sleep = mo.ui.anywidget(EdgeDraw(list(df_sleep.columns)))
+    return EdgeDraw, edge_draw, edge_draw_sleep
 
 
 @app.cell
@@ -877,17 +899,36 @@ def _(NotImplementedi):
 
 
 @app.cell
-def test_true():
-    def test_true():
-        assert True
-    return (test_true,)
+def _(pd, pl):
+    df_smoking = (pd.read_csv("https://calmcode.io/static/data/smoking.csv")
+                  .assign(age=lambda d: (d["age"] / 10).round() * 10))
+
+    df_sleep = (pl.read_csv("https://calmcode.io/static/data/sleep.csv")
+                 .with_columns(
+                     high_gpa=pl.col("gpa") > 24, 
+                     many_tests=pl.col("passed_unit_tests") > 3, 
+                     many_asserts=pl.col("passed_asserts") > 4,
+                     many_stories=pl.col("tackled_user_stories") > 2
+                 )
+                 .select("sleep", "high_gpa", "many_tests", "many_asserts", "many_stories")
+               ).to_pandas()
+    return df_sleep, df_smoking
 
 
 @app.cell
-def _(pd):
-    df_smoking = (pd.read_csv("https://calmcode.io/static/data/smoking.csv")
-                  .assign(age=lambda d: (d["age"] / 10).round() * 10))
-    return (df_smoking,)
+def _(DAG, df_sleep, edge_draw_sleep):
+    dag_sleep = DAG(
+        nodes=edge_draw_sleep.value["names"], 
+        edges=[(_['source'], _['target']) for _ in edge_draw_sleep.value["links"]],
+        dataframe=df_sleep
+    )
+    return (dag_sleep,)
+
+
+@app.cell
+def _(dag_sleep):
+    sleep, high_gpa, many_tests, many_asserts, many_stories = dag_sleep.get_variables()
+    return high_gpa, many_asserts, many_stories, many_tests, sleep
 
 
 if __name__ == "__main__":
