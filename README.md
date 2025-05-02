@@ -17,6 +17,34 @@ uv pip install peegeem
 
 ## Usage 
 
+This is how you might use this experiment. 
+
+```python
+from peegeem import DAG
+
+# Define the DAG for the PGM, nodes is a list of column names, edges is a list of tuples
+dag = DAG(nodes, edges, dataframe)
+
+# Get variables out
+outcome, smoker, age = dag.get_variables()
+
+# Use variables to construct a probablistic query
+P(outcome | (smoker == "Yes") & (age > 40))
+
+# Latex utility, why not?
+P.to_latex(outcome | (smoker == "Yes") & (age > 40))
+```
+
+The goal is to have an API that really closely mimics the math notation, so stuff like this:
+
+$$ P(\\text{outcome} \\mid do(\\text{smoker}=\\texttt{Yes}), \\text{age}>40) $$
+
+That means that we indeed also have a `do` function, though this needs more extensive testing. 
+
+```python 
+# You can also get crazy fancy 
+P(A & B | C & do(D))
+```
 
 ## Demo 
 
