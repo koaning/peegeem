@@ -20,4 +20,4 @@ uv pip install peegeem
 
 ## Demo 
 
-For a solid demo, download and run this notebook locally. 
+For a solid demo, download and run [this notebook](https://github.com/koaning/peegeem/blob/main/nbs/__init__.py) locally. 
