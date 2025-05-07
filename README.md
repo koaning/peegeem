@@ -48,4 +48,10 @@ P(A & B | C & do(D))
 
 ## Demo 
 
-For a solid demo, download and run [this notebook](https://github.com/koaning/peegeem/blob/main/nbs/__init__.py) locally. 
+For a solid demo, download and run [this notebook](https://github.com/koaning/peegeem/blob/main/nbs/__init__.py) locally.
+
+You can run the notebook in a sandboxed environment with uv. Navigate to the `nbs` directory and run:
+
+```
+uvx marimo edit --sandbox __init__.py
+```
