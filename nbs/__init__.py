@@ -15,7 +15,7 @@
 
 import marimo
 
-__generated_with = "0.12.10"
+__generated_with = "0.13.3"
 app = marimo.App(width="full")
 
 
@@ -73,7 +73,7 @@ def _(mo):
 
 
 @app.cell
-def _(P, age, alt, edge_draw, mo, outcome, pd, smoker):
+def _(P, age, alt, outcome, pd, smoker):
     age_range = range(10, 70, 10)
 
     alive_smoke = [
@@ -103,11 +103,15 @@ def _(P, age, alt, edge_draw, mo, outcome, pd, smoker):
             height=200
         )
     )
+    return chart_out, df_out
 
+
+@app.cell
+def _(chart_out, df_out, edge_draw, mo):
     mo.hstack([
-        edge_draw, df_out, chart_out
+        edge_draw, chart_out, df_out
     ], align="stretch")
-    return age_range, alive_no_smoke, alive_smoke, chart_out, df_out, pltr
+    return
 
 
 @app.cell
@@ -136,7 +140,7 @@ def _(df_sleep, df_smoking, mo):
 
     edge_draw = mo.ui.anywidget(EdgeDraw(list(df_smoking.columns)))
     edge_draw_sleep = mo.ui.anywidget(EdgeDraw(list(df_sleep.columns)))
-    return EdgeDraw, edge_draw, edge_draw_sleep
+    return edge_draw, edge_draw_sleep
 
 
 @app.cell
@@ -154,7 +158,7 @@ def _(P, mo):
             mo.md(f"$$ {P.to_latex(expr)} $=$"),
             pl.DataFrame(P(expr))
         ])
-    return p, pl
+    return (pl,)
 
 
 @app.cell
@@ -867,35 +871,7 @@ def _(NotImplementedi):
                 print(f"Error during inference via DAG.P for P({target_name} | {prepared_evidence}): {e}")
                 raise
 
-    return (
-        Any,
-        CausalInference,
-        Condition,
-        DAG,
-        Dict,
-        DiscreteBayesianNetwork,
-        DiscreteFactor,
-        DoCondition,
-        DoRangeCondition,
-        List,
-        MaximumLikelihoodEstimator,
-        Optional,
-        P,
-        P_Calculator,
-        QueryExpression,
-        TargetStateQuery,
-        Tuple,
-        Union,
-        VariablCombination,
-        Variable,
-        VariableCombination,
-        VariableElimination,
-        do,
-        itertools,
-        np,
-        pd,
-        re,
-    )
+    return DAG, P, do, pd
 
 
 @app.cell
