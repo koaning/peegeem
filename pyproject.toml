@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "peegeem"
-version = "0.0.1"
+version = "0.0.2"
 description = "PGMs that are fun to play with"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -30,4 +30,4 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["simsity"] 
+packages = ["peegeem"] 
